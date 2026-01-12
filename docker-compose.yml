@@ -1,0 +1,118 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: openpose-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - openpose-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: openpose-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - BACKEND_HOST=${BACKEND_HOST:-0.0.0.0}
+      - BACKEND_PORT=${BACKEND_PORT:-8000}
+      - UPLOAD_DIR=${UPLOAD_DIR:-/app/shared/uploads}
+      - PROCESSED_DIR=${PROCESSED_DIR:-/app/shared/processed}
+      - TEMP_DIR=${TEMP_DIR:-/app/shared/temp}
+      - MAX_FILE_SIZE=${MAX_FILE_SIZE:-524288000}
+      - VIDEO_EXPIRY_HOURS=${VIDEO_EXPIRY_HOURS:-24}
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL:-redis://redis:6379/0}
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND:-redis://redis:6379/0}
+      - OPENPOSE_MODEL=${OPENPOSE_MODEL:-BODY_25}
+      - OPENPOSE_NET_RESOLUTION=${OPENPOSE_NET_RESOLUTION:--1x368}
+      - OPENPOSE_RENDER_THRESHOLD=${OPENPOSE_RENDER_THRESHOLD:-0.05}
+      - USE_GPU=${USE_GPU:-false}
+    volumes:
+      - ./shared:/app/shared
+      - ./backend/app:/app/app
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - openpose-network
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    # Uncomment below for GPU support (requires nvidia-docker)
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+
+  celery-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: openpose-celery-worker
+    environment:
+      - BACKEND_HOST=${BACKEND_HOST:-0.0.0.0}
+      - BACKEND_PORT=${BACKEND_PORT:-8000}
+      - UPLOAD_DIR=${UPLOAD_DIR:-/app/shared/uploads}
+      - PROCESSED_DIR=${PROCESSED_DIR:-/app/shared/processed}
+      - TEMP_DIR=${TEMP_DIR:-/app/shared/temp}
+      - MAX_FILE_SIZE=${MAX_FILE_SIZE:-524288000}
+      - VIDEO_EXPIRY_HOURS=${VIDEO_EXPIRY_HOURS:-24}
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL:-redis://redis:6379/0}
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND:-redis://redis:6379/0}
+      - OPENPOSE_MODEL=${OPENPOSE_MODEL:-BODY_25}
+      - OPENPOSE_NET_RESOLUTION=${OPENPOSE_NET_RESOLUTION:--1x368}
+      - OPENPOSE_RENDER_THRESHOLD=${OPENPOSE_RENDER_THRESHOLD:-0.05}
+      - USE_GPU=${USE_GPU:-false}
+    volumes:
+      - ./shared:/app/shared
+      - ./backend/app:/app/app
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - openpose-network
+    command: celery -A app.tasks.celery_tasks worker --loglevel=info
+    # Uncomment below for GPU support (requires nvidia-docker)
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: development
+    container_name: openpose-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_API_URL=${VITE_API_URL:-http://localhost:8000}
+      - VITE_POLLING_INTERVAL=${VITE_POLLING_INTERVAL:-2000}
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+    depends_on:
+      - backend
+    networks:
+      - openpose-network
+    command: npm run dev -- --host
+
+networks:
+  openpose-network:
+    driver: bridge
+
+volumes:
+  shared:
