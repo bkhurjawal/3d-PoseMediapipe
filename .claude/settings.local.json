@@ -65,7 +65,9 @@
       "Bash(git remote add:*)",
       "Bash(echo:*)",
       "Bash(command -v git:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "WebFetch(domain:github.com)",
+      "Bash(pkill:*)"
     ]
   }
 }

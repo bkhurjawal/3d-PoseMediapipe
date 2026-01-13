@@ -9,9 +9,10 @@ class Settings(BaseSettings):
     backend_port: int = 8000
 
     # File paths
-    upload_dir: str = "/app/shared/uploads"
-    processed_dir: str = "/app/shared/processed"
-    temp_dir: str = "/app/shared/temp"
+    upload_dir: str = "./shared/uploads"
+    processed_dir: str = "./shared/processed"
+    temp_dir: str = "./shared/temp"
+    thumbnails_dir: str = "./shared/thumbnails"
 
     # File limits
     max_file_size: int = 524288000  # 500MB
@@ -47,3 +48,4 @@ settings = Settings()
 os.makedirs(settings.upload_dir, exist_ok=True)
 os.makedirs(settings.processed_dir, exist_ok=True)
 os.makedirs(settings.temp_dir, exist_ok=True)
+os.makedirs(settings.thumbnails_dir, exist_ok=True)

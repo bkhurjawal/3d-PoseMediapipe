@@ -14,6 +14,7 @@ from app.services.file_manager import (
 )
 from app.services.video_downloader import download_video_from_url, validate_video_url
 from app.services.video_processor import validate_video_file
+from app.services.thumbnail_generator import get_or_generate_thumbnail
 from app.tasks.celery_tasks import process_video_task, get_task_status
 from app.utils.exceptions import (
     VideoDownloadError,
@@ -200,9 +201,15 @@ async def serve_video(
         elif video_type == "processed":
             pattern = os.path.join(directory, f"{task_id}_processed.*")
         else:  # video_type == "3d"
-            pattern = os.path.join(directory, f"{task_id}_3d.*")
+            # Try both _3d and _processed patterns for backward compatibility
+            pattern_3d = os.path.join(directory, f"{task_id}_3d.*")
+            pattern_processed = os.path.join(directory, f"{task_id}_processed.*")
+            files_3d = glob.glob(pattern_3d)
+            files_processed = glob.glob(pattern_processed)
+            files = files_3d if files_3d else files_processed
 
-        files = glob.glob(pattern)
+        if video_type != "3d":
+            files = glob.glob(pattern)
 
         # Filter to only video files (not JSON)
         video_files = [f for f in files if f.endswith(('.mp4', '.avi', '.mov', '.webm', '.mkv'))]
@@ -279,6 +286,135 @@ async def get_landmarks(task_id: str = FastAPIPath(..., description="Task ID")):
         )
 
 
+@router.get("/video/all")
+async def get_all_videos():
+    """
+    Get a list of all processed videos
+
+    Returns:
+        List of video history items with metadata
+    """
+    try:
+        import json
+        from datetime import datetime
+
+        # Get all files from processed directory
+        processed_dir = settings.processed_dir
+        upload_dir = settings.upload_dir
+
+        # Find all processed video files (look for both _3d and _processed patterns)
+        pattern_processed = os.path.join(processed_dir, "*_processed.*")
+        pattern_3d = os.path.join(processed_dir, "*_3d.*")
+        video_files = glob.glob(pattern_processed) + glob.glob(pattern_3d)
+
+        videos = []
+        for video_file in video_files:
+            # Extract task_id from filename
+            filename = os.path.basename(video_file)
+            # Handle both _processed and _3d naming patterns
+            if '_3d' in filename:
+                task_id = filename.split('_3d')[0]
+            elif '_processed' in filename:
+                task_id = filename.split('_processed')[0]
+            else:
+                continue
+
+            # Get file metadata
+            stat = os.stat(video_file)
+            created_at = datetime.fromtimestamp(stat.st_ctime).isoformat()
+            updated_at = datetime.fromtimestamp(stat.st_mtime).isoformat()
+
+            # Try to get task status
+            try:
+                status_info = get_task_status(task_id)
+                status = status_info.get('status', 'completed')
+                metadata = status_info.get('result', {}).get('metadata', None)
+            except:
+                status = 'completed'
+                metadata = None
+
+            # Generate thumbnail
+            thumbnail_path = get_or_generate_thumbnail(
+                video_file,
+                task_id,
+                settings.thumbnails_dir
+            )
+
+            # Create thumbnail URL if thumbnail exists
+            thumbnail_url = None
+            if thumbnail_path and os.path.exists(thumbnail_path):
+                # Use relative URL for API
+                from urllib.parse import quote
+                thumbnail_url = f"/api/v1/video/thumbnail/{task_id}"
+
+            videos.append({
+                'task_id': task_id,
+                'status': status,
+                'created_at': created_at,
+                'updated_at': updated_at,
+                'metadata': metadata,
+                'thumbnail_url': thumbnail_url
+            })
+
+        # Sort by updated_at descending (newest first)
+        videos.sort(key=lambda x: x['updated_at'], reverse=True)
+
+        return videos
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get video list: {str(e)}"
+        )
+
+
+@router.get("/video/thumbnail/{task_id}")
+async def get_thumbnail(task_id: str = FastAPIPath(..., description="Task ID")):
+    """
+    Get the thumbnail image for a video
+
+    Args:
+        task_id: Unique task ID
+
+    Returns:
+        Thumbnail image file
+    """
+    try:
+        thumbnail_path = os.path.join(settings.thumbnails_dir, f"{task_id}_thumb.jpg")
+
+        if not os.path.exists(thumbnail_path):
+            # Try to generate thumbnail from processed video
+            processed_pattern = os.path.join(settings.processed_dir, f"{task_id}_processed.*")
+            video_files = glob.glob(processed_pattern)
+
+            if video_files:
+                thumbnail_path = get_or_generate_thumbnail(
+                    video_files[0],
+                    task_id,
+                    settings.thumbnails_dir
+                )
+
+        if not thumbnail_path or not os.path.exists(thumbnail_path):
+            raise HTTPException(
+                status_code=404,
+                detail=f"Thumbnail not found for task {task_id}"
+            )
+
+        return FileResponse(
+            thumbnail_path,
+            media_type="image/jpeg",
+            filename=f"{task_id}_thumb.jpg"
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to serve thumbnail: {str(e)}"
+        )
+
+
 @router.delete("/video/{task_id}")
 async def delete_video(task_id: str = FastAPIPath(..., description="Task ID")):
     """
@@ -292,6 +428,12 @@ async def delete_video(task_id: str = FastAPIPath(..., description="Task ID")):
     """
     try:
         cleanup_task_files(task_id)
+
+        # Also delete thumbnail if exists
+        thumbnail_path = os.path.join(settings.thumbnails_dir, f"{task_id}_thumb.jpg")
+        if os.path.exists(thumbnail_path):
+            os.remove(thumbnail_path)
+
         return {"message": f"Files for task {task_id} deleted successfully"}
     except Exception as e:
         raise HTTPException(

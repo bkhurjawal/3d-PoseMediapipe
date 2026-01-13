@@ -65,3 +65,8 @@ export const getLandmarks = async (taskId: string): Promise<any> => {
   const response = await api.get(`/api/v1/video/landmarks/${taskId}`);
   return response.data;
 };
+
+export const getAllVideos = async (): Promise<any[]> => {
+  const response = await api.get('/api/v1/video/all');
+  return response.data;
+};

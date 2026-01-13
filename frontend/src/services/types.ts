@@ -32,3 +32,12 @@ export interface ProcessingStatusResponse {
 export interface VideoUrlRequest {
   video_url: string;
 }
+
+export interface VideoHistoryItem {
+  task_id: string;
+  status: TaskStatus;
+  created_at: string;
+  updated_at: string;
+  metadata?: VideoMetadata;
+  thumbnail_url?: string;
+}

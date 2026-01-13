@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useDropzone } from 'react-dropzone';
 import {
   Box,
@@ -11,6 +12,7 @@ import {
 } from '@mui/material';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import LinkIcon from '@mui/icons-material/Link';
+import HistoryIcon from '@mui/icons-material/History';
 
 interface VideoUploadProps {
   onFileUpload: (file: File) => void;
@@ -21,6 +23,7 @@ export const VideoUpload: React.FC<VideoUploadProps> = ({
   onFileUpload,
   onUrlUpload,
 }) => {
+  const navigate = useNavigate();
   const [videoUrl, setVideoUrl] = useState('');
   const [error, setError] = useState<string | null>(null);
 
@@ -62,9 +65,21 @@ export const VideoUpload: React.FC<VideoUploadProps> = ({
 
   return (
     <Box sx={{ maxWidth: 800, margin: '0 auto', p: 3 }}>
-      <Typography variant="h4" gutterBottom align="center">
-        OpenPose 3D Pose Reconstruction
-      </Typography>
+      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+        <Box sx={{ flex: 1 }} />
+        <Typography variant="h4" gutterBottom align="center" sx={{ flex: 1 }}>
+          OpenPose 3D Pose Reconstruction
+        </Typography>
+        <Box sx={{ flex: 1, display: 'flex', justifyContent: 'flex-end' }}>
+          <Button
+            variant="outlined"
+            startIcon={<HistoryIcon />}
+            onClick={() => navigate('/history')}
+          >
+            View History
+          </Button>
+        </Box>
+      </Stack>
       <Typography variant="subtitle1" gutterBottom align="center" color="text.secondary">
         Upload a video or provide a URL to see whole-body 3D pose estimation
       </Typography>
