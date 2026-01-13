@@ -177,7 +177,9 @@ export const Pose3DViewer: React.FC<Pose3DViewerProps> = ({
         setError(null);
         console.log(`Loading landmarks for task: ${taskId}`);
         const data = await getLandmarks(taskId);
-        console.log(`Loaded ${data.landmarks?.length || 0} frames of landmark data`);
+        console.log(
+          `Loaded ${data.landmarks?.length || 0} frames of landmark data`
+        );
 
         if (!data.landmarks || data.landmarks.length === 0) {
           throw new Error('No landmark data available');
@@ -187,7 +189,8 @@ export const Pose3DViewer: React.FC<Pose3DViewerProps> = ({
         setTotalFrames(data.landmarks.length);
         setLoading(false);
       } catch (err) {
-        const errorMsg = err instanceof Error ? err.message : 'Failed to load landmarks';
+        const errorMsg =
+          err instanceof Error ? err.message : 'Failed to load landmarks';
         console.error('Error loading landmarks:', errorMsg);
         setError(errorMsg);
         setLoading(false);
@@ -207,10 +210,66 @@ export const Pose3DViewer: React.FC<Pose3DViewerProps> = ({
 
     const landmarks = landmarksRef.current[frameIndex];
 
-    // Create landmarks (spheres) - larger for better visibility
-    landmarks.forEach((lm: any) => {
-      const geometry = new THREE.SphereGeometry(0.035, 16, 16);
-      const material = new THREE.MeshStandardMaterial({ color: 0xff4444 });
+    const HIDDEN_INDICES = new Set([
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10, // Face
+      17,
+      18,
+      19,
+      20,
+      21,
+      22, // Fingers
+      31,
+      32, // Toes
+    ]);
+
+    // Helper to get raw position
+    const getRawPos = (idx: number) => landmarks[idx];
+
+    // Render Head
+    const nose = getRawPos(0);
+    const leftEar = getRawPos(7);
+    const rightEar = getRawPos(8);
+
+    if (nose && leftEar && rightEar) {
+      const headCenter = new THREE.Vector3(
+        (leftEar.x + rightEar.x) / 2,
+        (nose.y + leftEar.y + rightEar.y) / 3, // Approximate center
+        (leftEar.z + rightEar.z) / 2
+      );
+      // Invert for 3D space
+      const finalHeadPos = new THREE.Vector3(
+        headCenter.x,
+        -headCenter.y,
+        -headCenter.z
+      );
+
+      const headWidth = Math.abs(leftEar.x - rightEar.x) * 0.8 || 0.15; // Fallback size if single point
+      const headGeometry = new THREE.SphereGeometry(1, 16, 16);
+      // Scale to make an ellipsoid
+      headGeometry.scale(headWidth, headWidth * 1.3, headWidth);
+
+      const headMaterial = new THREE.MeshStandardMaterial({ color: 0x00ffff });
+      const headMesh = new THREE.Mesh(headGeometry, headMaterial);
+      headMesh.position.copy(finalHeadPos);
+      skeletonGroupRef.current!.add(headMesh);
+    }
+
+    // Create landmarks (spheres)
+    landmarks.forEach((lm: any, index: number) => {
+      if (HIDDEN_INDICES.has(index)) return;
+
+      const geometry = new THREE.SphereGeometry(0.02, 16, 16); // Reduced size
+      const material = new THREE.MeshStandardMaterial({ color: 0x00ffff });
       const sphere = new THREE.Mesh(geometry, material);
       sphere.position.set(lm.x, -lm.y, -lm.z); // Invert Y and Z for proper orientation
       skeletonGroupRef.current!.add(sphere);
@@ -218,6 +277,9 @@ export const Pose3DViewer: React.FC<Pose3DViewerProps> = ({
 
     // Create connections (lines)
     POSE_CONNECTIONS.forEach(([start, end]) => {
+      // Skip connections if either point is hidden
+      if (HIDDEN_INDICES.has(start) || HIDDEN_INDICES.has(end)) return;
+
       if (start < landmarks.length && end < landmarks.length) {
         const points = [
           new THREE.Vector3(
@@ -233,7 +295,7 @@ export const Pose3DViewer: React.FC<Pose3DViewerProps> = ({
         ];
         const geometry = new THREE.BufferGeometry().setFromPoints(points);
         const material = new THREE.LineBasicMaterial({
-          color: 0x00aaff,
+          color: 0x00ffff,
           linewidth: 2,
         });
         const line = new THREE.Line(geometry, material);
