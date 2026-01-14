@@ -164,15 +164,16 @@ export const Pose3DViewerBones: React.FC<Pose3DViewerBonesProps> = ({
     const direction = new THREE.Vector3().subVectors(end, start);
     const length = direction.length();
 
-    const geometry = new THREE.CylinderGeometry(radius, radius, length, 8, 1);
+    const geometry = new THREE.CylinderGeometry(radius, radius, length, 16, 1);
 
-    // X-ray material with glow
+    // X-ray material with glow - more visible
     const material = new THREE.MeshPhongMaterial({
-      color: 0x00ddff, // Cyan color
-      emissive: 0x0088cc, // Blue glow
+      color: 0x00ffff, // Bright cyan color
+      emissive: 0x00aacc, // Bright blue glow
       transparent: true,
-      opacity: 0.7,
+      opacity: 0.9, // More opaque
       shininess: 100,
+      side: THREE.DoubleSide,
     });
 
     const bone = new THREE.Mesh(geometry, material);
@@ -220,30 +221,31 @@ export const Pose3DViewerBones: React.FC<Pose3DViewerBonesProps> = ({
       -(nose.z + leftEar.z + rightEar.z) / 3
     );
 
-    const skullGeometry = new THREE.SphereGeometry(0.08, 16, 16);
+    const skullGeometry = new THREE.SphereGeometry(0.1, 24, 24);
     const skullMaterial = new THREE.MeshPhongMaterial({
-      color: 0x00ddff,
-      emissive: 0x0088cc,
+      color: 0x00ffff,
+      emissive: 0x00aacc,
       transparent: true,
-      opacity: 0.4,
+      opacity: 0.6,
       shininess: 100,
       wireframe: true,
+      side: THREE.DoubleSide,
     });
     const skull = new THREE.Mesh(skullGeometry, skullMaterial);
     skull.position.copy(headCenter);
     skeletonGroupRef.current!.add(skull);
 
-    // Spine
+    // Spine - thicker and more visible
     const shoulderCenter = new THREE.Vector3()
       .addVectors(leftShoulderPos, rightShoulderPos)
       .multiplyScalar(0.5);
     const hipCenter = new THREE.Vector3()
       .addVectors(leftHipPos, rightHipPos)
       .multiplyScalar(0.5);
-    const spine = createXRayBone(shoulderCenter, hipCenter, 0.02);
+    const spine = createXRayBone(shoulderCenter, hipCenter, 0.025);
     skeletonGroupRef.current!.add(spine);
 
-    // Ribs (simplified representation)
+    // Ribs (simplified representation) - thicker
     const numRibs = 6;
     for (let i = 0; i < numRibs; i++) {
       const t = i / (numRibs - 1);
@@ -260,7 +262,7 @@ export const Pose3DViewerBones: React.FC<Pose3DViewerBonesProps> = ({
         ribCenter.y,
         ribCenter.z - 0.05
       );
-      const leftRib = createXRayBone(ribCenter, leftRibEnd, 0.008);
+      const leftRib = createXRayBone(ribCenter, leftRibEnd, 0.012);
       skeletonGroupRef.current!.add(leftRib);
 
       // Right rib
@@ -269,64 +271,65 @@ export const Pose3DViewerBones: React.FC<Pose3DViewerBonesProps> = ({
         ribCenter.y,
         ribCenter.z - 0.05
       );
-      const rightRib = createXRayBone(ribCenter, rightRibEnd, 0.008);
+      const rightRib = createXRayBone(ribCenter, rightRibEnd, 0.012);
       skeletonGroupRef.current!.add(rightRib);
     }
 
-    // Arms
-    const leftUpperArm = createXRayBone(leftShoulderPos, getPos(13), 0.015);
+    // Arms - thicker
+    const leftUpperArm = createXRayBone(leftShoulderPos, getPos(13), 0.02);
     skeletonGroupRef.current!.add(leftUpperArm);
-    const leftForearm = createXRayBone(getPos(13), getPos(15), 0.012);
+    const leftForearm = createXRayBone(getPos(13), getPos(15), 0.018);
     skeletonGroupRef.current!.add(leftForearm);
 
-    const rightUpperArm = createXRayBone(rightShoulderPos, getPos(14), 0.015);
+    const rightUpperArm = createXRayBone(rightShoulderPos, getPos(14), 0.02);
     skeletonGroupRef.current!.add(rightUpperArm);
-    const rightForearm = createXRayBone(getPos(14), getPos(16), 0.012);
+    const rightForearm = createXRayBone(getPos(14), getPos(16), 0.018);
     skeletonGroupRef.current!.add(rightForearm);
 
-    // Legs
-    const leftThigh = createXRayBone(leftHipPos, getPos(25), 0.02);
+    // Legs - thicker
+    const leftThigh = createXRayBone(leftHipPos, getPos(25), 0.025);
     skeletonGroupRef.current!.add(leftThigh);
-    const leftShin = createXRayBone(getPos(25), getPos(27), 0.015);
+    const leftShin = createXRayBone(getPos(25), getPos(27), 0.02);
     skeletonGroupRef.current!.add(leftShin);
 
-    const rightThigh = createXRayBone(rightHipPos, getPos(26), 0.02);
+    const rightThigh = createXRayBone(rightHipPos, getPos(26), 0.025);
     skeletonGroupRef.current!.add(rightThigh);
-    const rightShin = createXRayBone(getPos(26), getPos(28), 0.015);
+    const rightShin = createXRayBone(getPos(26), getPos(28), 0.02);
     skeletonGroupRef.current!.add(rightShin);
 
-    // Pelvis
-    const pelvis = createXRayBone(leftHipPos, rightHipPos, 0.02);
+    // Pelvis - thicker
+    const pelvis = createXRayBone(leftHipPos, rightHipPos, 0.025);
     skeletonGroupRef.current!.add(pelvis);
 
-    // Shoulders/Clavicles
-    const clavicles = createXRayBone(leftShoulderPos, rightShoulderPos, 0.015);
+    // Shoulders/Clavicles - thicker
+    const clavicles = createXRayBone(leftShoulderPos, rightShoulderPos, 0.02);
     skeletonGroupRef.current!.add(clavicles);
 
-    // Joints with glow effect
+    // Joints with glow effect - larger and brighter
     landmarks.forEach((lm: any, index: number) => {
       if (HIDDEN_INDICES.has(index)) return;
 
-      let jointSize = 0.015;
+      let jointSize = 0.02;
       if ([11, 12, 23, 24].includes(index)) {
-        jointSize = 0.025;
+        jointSize = 0.03; // Shoulders and hips
       } else if ([13, 14, 25, 26].includes(index)) {
-        jointSize = 0.02;
+        jointSize = 0.025; // Elbows and knees
       }
 
-      const geometry = new THREE.SphereGeometry(jointSize, 12, 12);
+      const geometry = new THREE.SphereGeometry(jointSize, 16, 16);
       const material = new THREE.MeshPhongMaterial({
         color: 0x00ffff,
-        emissive: 0x00aacc,
+        emissive: 0x00ddff,
         transparent: true,
-        opacity: 0.8,
+        opacity: 0.95,
         shininess: 100,
+        side: THREE.DoubleSide,
       });
       const sphere = new THREE.Mesh(geometry, material);
       sphere.position.set(lm.x, -lm.y, -lm.z);
 
-      // Add point light at joints for glow
-      const pointLight = new THREE.PointLight(0x00ddff, 0.5, 0.3);
+      // Add point light at joints for glow - brighter
+      const pointLight = new THREE.PointLight(0x00ffff, 1.0, 0.5);
       pointLight.position.copy(sphere.position);
       skeletonGroupRef.current!.add(pointLight);
 
