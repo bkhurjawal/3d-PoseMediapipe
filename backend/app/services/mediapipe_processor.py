@@ -32,10 +32,10 @@ class MediaPipeProcessor:
             from pathlib import Path
             
             # Get the absolute model path
-            # Navigate from this file to backend/models/pose_landmarker_lite.task
+            # Navigate from this file to backend/models/pose_landmarker_heavy.task
             current_file = Path(__file__).resolve()
             backend_dir = current_file.parent.parent.parent  # Go up to backend/
-            model_path = str(backend_dir / 'models' / 'pose_landmarker_lite.task')
+            model_path = str(backend_dir / 'models' / 'pose_landmarker_heavy.task')
             
             if not os.path.exists(model_path):
                 raise FileNotFoundError(f"Model file not found at: {model_path}")
@@ -57,7 +57,7 @@ class MediaPipeProcessor:
             
             self.pose_landmarker = vision.PoseLandmarker.create_from_options(options)
             self.initialized = True
-            print("✅ MediaPipe Pose initialized successfully (using tasks API)")
+            print("✅ MediaPipe Pose initialized successfully (using Heavy model)")
 
         except Exception as e:
             print(f"❌ Failed to initialize MediaPipe Pose: {e}")
