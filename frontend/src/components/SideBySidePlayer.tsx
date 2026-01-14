@@ -14,6 +14,8 @@ import {
   Typography,
   IconButton,
   Paper,
+  ToggleButtonGroup,
+  ToggleButton,
 } from '@mui/material';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import PauseIcon from '@mui/icons-material/Pause';
@@ -25,6 +27,7 @@ import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import ReplayIcon from '@mui/icons-material/Replay';
 import { VideoPlayer, VideoPlayerHandle } from './VideoPlayer';
 import { Pose3DViewerSync } from './Pose3DViewerSync';
+import { Pose3DViewerBones } from './Pose3DViewerBones';
 import { deleteVideo } from '../services/api';
 
 interface SideBySidePlayerProps {
@@ -56,6 +59,7 @@ export const SideBySidePlayer: React.FC<SideBySidePlayerProps> = ({
   const [currentFrame, setCurrentFrame] = useState(0);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [modelType, setModelType] = useState<'humanoid' | 'bones'>('humanoid');
   const FPS = 25; // Default FPS
 
   const handlePlayPause = () => {
@@ -206,21 +210,67 @@ export const SideBySidePlayer: React.FC<SideBySidePlayerProps> = ({
             />
           </Grid>
           <Grid item xs={12} lg={6}>
-            <Box
-              sx={{
-                height: '100%',
-                minHeight: 400,
-                bgcolor: 'black',
-                borderRadius: 1,
-                overflow: 'hidden',
-              }}
-            >
-              <Pose3DViewerSync
-                taskId={taskId}
-                currentFrame={currentFrame}
-                height="100%"
-              />
-            </Box>
+            <Stack spacing={1}>
+              {/* Model Type Selector */}
+              <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+                <ToggleButtonGroup
+                  value={modelType}
+                  exclusive
+                  onChange={(e, newValue) => {
+                    if (newValue !== null) {
+                      setModelType(newValue);
+                    }
+                  }}
+                  size="small"
+                  sx={{
+                    bgcolor: '#1e1e1e',
+                    '& .MuiToggleButton-root': {
+                      color: '#b0b0b0',
+                      borderColor: '#333',
+                      '&.Mui-selected': {
+                        bgcolor: '#2196f3',
+                        color: 'white',
+                        '&:hover': {
+                          bgcolor: '#1976d2',
+                        },
+                      },
+                    },
+                  }}
+                >
+                  <ToggleButton value="humanoid">
+                    Humanoid Model
+                  </ToggleButton>
+                  <ToggleButton value="bones">
+                    X-Ray Bones
+                  </ToggleButton>
+                </ToggleButtonGroup>
+              </Box>
+
+              {/* 3D Viewer */}
+              <Box
+                sx={{
+                  height: '100%',
+                  minHeight: 400,
+                  bgcolor: 'black',
+                  borderRadius: 1,
+                  overflow: 'hidden',
+                }}
+              >
+                {modelType === 'humanoid' ? (
+                  <Pose3DViewerSync
+                    taskId={taskId}
+                    currentFrame={currentFrame}
+                    height="100%"
+                  />
+                ) : (
+                  <Pose3DViewerBones
+                    taskId={taskId}
+                    currentFrame={currentFrame}
+                    height="100%"
+                  />
+                )}
+              </Box>
+            </Stack>
           </Grid>
         </Grid>
 
