@@ -5,8 +5,10 @@ interface VideoPlayerProps {
   videoUrl: string;
   title: string;
   onTimeUpdate?: (currentTime: number) => void;
+  onDurationChange?: (duration: number) => void;
   onPlay?: () => void;
   onPause?: () => void;
+  showControls?: boolean;
 }
 
 export interface VideoPlayerHandle {
@@ -14,10 +16,22 @@ export interface VideoPlayerHandle {
   pause: () => void;
   seek: (time: number) => void;
   getCurrentTime: () => number;
+  getDuration: () => number;
 }
 
 export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
-  ({ videoUrl, title, onTimeUpdate, onPlay, onPause }, ref) => {
+  (
+    {
+      videoUrl,
+      title,
+      onTimeUpdate,
+      onDurationChange,
+      onPlay,
+      onPause,
+      showControls = true,
+    },
+    ref
+  ) => {
     const videoRef = useRef<HTMLVideoElement>(null);
 
     useImperativeHandle(ref, () => ({
@@ -35,6 +49,9 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
       getCurrentTime: () => {
         return videoRef.current?.currentTime || 0;
       },
+      getDuration: () => {
+        return videoRef.current?.duration || 0;
+      },
     }));
 
     useEffect(() => {
@@ -44,6 +61,12 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
       const handleTimeUpdate = () => {
         if (onTimeUpdate) {
           onTimeUpdate(video.currentTime);
+        }
+      };
+
+      const handleDurationChange = () => {
+        if (onDurationChange) {
+          onDurationChange(video.duration);
         }
       };
 
@@ -60,18 +83,22 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
       };
 
       video.addEventListener('timeupdate', handleTimeUpdate);
+      video.addEventListener('durationchange', handleDurationChange);
+      video.addEventListener('loadedmetadata', handleDurationChange);
       video.addEventListener('play', handlePlay);
       video.addEventListener('pause', handlePause);
 
       return () => {
         video.removeEventListener('timeupdate', handleTimeUpdate);
+        video.removeEventListener('durationchange', handleDurationChange);
+        video.removeEventListener('loadedmetadata', handleDurationChange);
         video.removeEventListener('play', handlePlay);
         video.removeEventListener('pause', handlePause);
       };
-    }, [onTimeUpdate, onPlay, onPause]);
+    }, [onTimeUpdate, onDurationChange, onPlay, onPause]);
 
     return (
-      <Paper sx={{ p: 2 }}>
+      <Paper sx={{ p: 2, bgcolor: 'background.paper' }}>
         <Typography variant="h6" gutterBottom align="center">
           {title}
         </Typography>
@@ -87,7 +114,7 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
           <video
             ref={videoRef}
             src={videoUrl}
-            controls
+            controls={showControls}
             style={{
               position: 'absolute',
               top: 0,

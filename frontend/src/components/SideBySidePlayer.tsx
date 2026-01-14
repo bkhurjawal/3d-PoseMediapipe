@@ -1,12 +1,28 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Grid, Button, Stack, Dialog, DialogTitle, DialogContent, DialogActions, DialogContentText } from '@mui/material';
+import {
+  Box,
+  Grid,
+  Button,
+  Stack,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  DialogContentText,
+  Slider,
+  Typography,
+  IconButton,
+  Paper,
+} from '@mui/material';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import PauseIcon from '@mui/icons-material/Pause';
-import ReplayIcon from '@mui/icons-material/Replay';
+import SkipNextIcon from '@mui/icons-material/SkipNext';
+import SkipPreviousIcon from '@mui/icons-material/SkipPrevious';
 import DeleteIcon from '@mui/icons-material/Delete';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import ReplayIcon from '@mui/icons-material/Replay';
 import { VideoPlayer, VideoPlayerHandle } from './VideoPlayer';
 import { Pose3DViewerSync } from './Pose3DViewerSync';
 import { deleteVideo } from '../services/api';
@@ -18,6 +34,14 @@ interface SideBySidePlayerProps {
   onReset?: () => void;
 }
 
+const formatTime = (seconds: number) => {
+  const pad = (num: number) => num.toString().padStart(2, '0');
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  const ms = Math.floor((seconds % 1) * 100);
+  return `${pad(mins)}:${pad(secs)}`;
+};
+
 export const SideBySidePlayer: React.FC<SideBySidePlayerProps> = ({
   taskId,
   originalVideoUrl,
@@ -28,10 +52,11 @@ export const SideBySidePlayer: React.FC<SideBySidePlayerProps> = ({
   const originalRef = useRef<VideoPlayerHandle>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
   const [currentFrame, setCurrentFrame] = useState(0);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const FPS = 25; // Default FPS, should be fetched from backend metadata
+  const FPS = 25; // Default FPS
 
   const handlePlayPause = () => {
     if (isPlaying) {
@@ -47,6 +72,10 @@ export const SideBySidePlayer: React.FC<SideBySidePlayerProps> = ({
     setCurrentFrame(Math.floor(time * FPS));
   };
 
+  const handleDurationChange = (dur: number) => {
+    setDuration(dur);
+  };
+
   const handleOriginalPlay = () => {
     setIsPlaying(true);
   };
@@ -55,8 +84,29 @@ export const SideBySidePlayer: React.FC<SideBySidePlayerProps> = ({
     setIsPlaying(false);
   };
 
+  const handleSeek = (event: Event, newValue: number | number[]) => {
+    const time = newValue as number;
+    originalRef.current?.seek(time);
+    setCurrentTime(time);
+    setCurrentFrame(Math.floor(time * FPS));
+  };
+
+  const handleStepFrame = (direction: 'next' | 'prev') => {
+    const frameTime = 1 / FPS;
+    const newTime =
+      direction === 'next'
+        ? Math.min(currentTime + frameTime, duration)
+        : Math.max(currentTime - frameTime, 0);
+
+    originalRef.current?.seek(newTime);
+    // Pause if stepping
+    if (isPlaying) {
+      originalRef.current?.pause();
+      setIsPlaying(false);
+    }
+  };
+
   const handleOpen3DViewer = () => {
-    // Open interactive 3D viewer in a new window
     window.open(`/3d-viewer/${taskId}`, '_blank', 'width=1400,height=900');
   };
 
@@ -69,7 +119,6 @@ export const SideBySidePlayer: React.FC<SideBySidePlayerProps> = ({
       setDeleting(true);
       await deleteVideo(taskId);
       setDeleteDialogOpen(false);
-      // Navigate to history page after deletion
       navigate('/history');
     } catch (error) {
       alert('Failed to delete video. Please try again.');
@@ -88,59 +137,61 @@ export const SideBySidePlayer: React.FC<SideBySidePlayerProps> = ({
   };
 
   return (
-    <Box sx={{ maxWidth: 1600, margin: '0 auto', p: 3 }}>
-      <Stack spacing={3}>
-        {/* Top Navigation */}
-        <Stack direction="row" spacing={2} justifyContent="space-between" alignItems="center">
+    <Box
+      sx={{
+        maxWidth: '100vw',
+        minHeight: '100vh',
+        bgcolor: '#121212',
+        color: 'white',
+        p: 3,
+      }}
+    >
+      <Stack spacing={3} maxWidth={1600} mx="auto">
+        {/* Header Navigation */}
+        <Stack
+          direction="row"
+          spacing={2}
+          justifyContent="space-between"
+          alignItems="center"
+        >
           <Button
-            variant="outlined"
             startIcon={<ArrowBackIcon />}
             onClick={handleBackToHistory}
+            sx={{ color: 'white', borderColor: 'rgba(255,255,255,0.3)' }}
+            variant="outlined"
           >
             Back to History
           </Button>
-          <Button
-            variant="outlined"
-            color="error"
-            startIcon={<DeleteIcon />}
-            onClick={handleDeleteClick}
-          >
-            Delete Video
-          </Button>
-        </Stack>
-
-        {/* Synchronized Controls */}
-        <Stack direction="row" spacing={2} justifyContent="center" flexWrap="wrap">
-          <Button
-            variant="contained"
-            startIcon={isPlaying ? <PauseIcon /> : <PlayArrowIcon />}
-            onClick={handlePlayPause}
-            size="large"
-          >
-            {isPlaying ? 'Pause' : 'Play'}
-          </Button>
-          <Button
-            variant="outlined"
-            color="secondary"
-            startIcon={<OpenInNewIcon />}
-            onClick={handleOpen3DViewer}
-            size="large"
-          >
-            Open 3D in New Window
-          </Button>
-          {onReset && (
+          <Stack direction="row" spacing={2}>
+            {onReset && (
+              <Button
+                startIcon={<ReplayIcon />}
+                onClick={onReset}
+                sx={{ color: 'white', borderColor: 'rgba(255,255,255,0.3)' }}
+                variant="outlined"
+              >
+                Process New
+              </Button>
+            )}
             <Button
+              startIcon={<OpenInNewIcon />}
+              onClick={handleOpen3DViewer}
+              sx={{ color: 'white', borderColor: 'rgba(255,255,255,0.3)' }}
               variant="outlined"
-              startIcon={<ReplayIcon />}
-              onClick={onReset}
-              size="large"
             >
-              Process New Video
+              Open 3D Window
             </Button>
-          )}
+            <Button
+              color="error"
+              startIcon={<DeleteIcon />}
+              onClick={handleDeleteClick}
+            >
+              Delete
+            </Button>
+          </Stack>
         </Stack>
 
-        {/* Video Players and 3D Viewer */}
+        {/* Listeners for Play/Pause sync */}
         <Grid container spacing={3}>
           <Grid item xs={12} lg={6}>
             <VideoPlayer
@@ -148,12 +199,22 @@ export const SideBySidePlayer: React.FC<SideBySidePlayerProps> = ({
               videoUrl={originalVideoUrl}
               title="Original Video"
               onTimeUpdate={handleOriginalTimeUpdate}
+              onDurationChange={handleDurationChange}
               onPlay={handleOriginalPlay}
               onPause={handleOriginalPause}
+              showControls={false}
             />
           </Grid>
           <Grid item xs={12} lg={6}>
-            <Box sx={{ height: '100%', minHeight: 500 }}>
+            <Box
+              sx={{
+                height: '100%',
+                minHeight: 400,
+                bgcolor: 'black',
+                borderRadius: 1,
+                overflow: 'hidden',
+              }}
+            >
               <Pose3DViewerSync
                 taskId={taskId}
                 currentFrame={currentFrame}
@@ -162,35 +223,126 @@ export const SideBySidePlayer: React.FC<SideBySidePlayerProps> = ({
             </Box>
           </Grid>
         </Grid>
+
+        {/* Timeline Control Bar */}
+        <Paper
+          sx={{
+            p: 2,
+            bgcolor: '#1e1e1e',
+            borderRadius: 2,
+            border: '1px solid #333',
+          }}
+        >
+          <Stack spacing={1}>
+            <Slider
+              value={currentTime}
+              min={0}
+              max={duration || 100}
+              onChange={handleSeek}
+              sx={{
+                color: '#2196f3',
+                height: 8,
+                '& .MuiSlider-thumb': {
+                  width: 24,
+                  height: 24,
+                  backgroundColor: '#fff',
+                  border: '2px solid currentColor',
+                  '&:focus, &:hover, &.Mui-active, &.Mui-focusVisible': {
+                    boxShadow: 'inherit',
+                  },
+                  '&:before': {
+                    display: 'none',
+                  },
+                },
+                '& .MuiSlider-track': {
+                  border: 'none',
+                },
+                '& .MuiSlider-rail': {
+                  opacity: 0.3,
+                  backgroundColor: '#bfbfbf',
+                },
+              }}
+            />
+
+            <Stack
+              direction="row"
+              alignItems="center"
+              justifyContent="space-between"
+            >
+              <Box
+                sx={{
+                  minWidth: 100,
+                  color: '#b0b0b0',
+                  typography: 'body2',
+                }}
+              >
+                Frame: {currentFrame}
+              </Box>
+
+              <Stack direction="row" spacing={2} alignItems="center">
+                <IconButton
+                  onClick={() => handleStepFrame('prev')}
+                  sx={{ color: 'white' }}
+                >
+                  <SkipPreviousIcon />
+                </IconButton>
+                <IconButton
+                  onClick={handlePlayPause}
+                  sx={{
+                    color: 'white',
+                    bgcolor: 'primary.main',
+                    '&:hover': { bgcolor: 'primary.dark' },
+                    width: 48,
+                    height: 48,
+                  }}
+                >
+                  {isPlaying ? <PauseIcon /> : <PlayArrowIcon />}
+                </IconButton>
+                <IconButton
+                  onClick={() => handleStepFrame('next')}
+                  sx={{ color: 'white' }}
+                >
+                  <SkipNextIcon />
+                </IconButton>
+              </Stack>
+
+              <Box
+                sx={{
+                  minWidth: 100,
+                  textAlign: 'right',
+                  color: '#b0b0b0',
+                  typography: 'body2',
+                }}
+              >
+                {formatTime(currentTime)} / {formatTime(duration)}
+              </Box>
+            </Stack>
+          </Stack>
+        </Paper>
       </Stack>
 
-      {/* Delete Confirmation Dialog */}
       <Dialog
         open={deleteDialogOpen}
         onClose={handleDeleteCancel}
-        aria-labelledby="delete-dialog-title"
+        PaperProps={{ sx: { bgcolor: '#1e1e1e', color: 'white' } }}
       >
-        <DialogTitle id="delete-dialog-title">
-          Delete Video?
-        </DialogTitle>
+        <DialogTitle sx={{ color: 'white' }}>Delete Video?</DialogTitle>
         <DialogContent>
-          <DialogContentText>
-            Are you sure you want to delete this video? This action cannot be undone.
-            All associated files including the original video, processed video, and 3D pose data will be permanently deleted.
+          <DialogContentText sx={{ color: 'gray' }}>
+            Are you sure you want to delete this video? This action cannot be
+            undone.
           </DialogContentText>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleDeleteCancel} disabled={deleting}>
+          <Button onClick={handleDeleteCancel} sx={{ color: 'gray' }}>
             Cancel
           </Button>
           <Button
             onClick={handleDeleteConfirm}
             color="error"
             variant="contained"
-            disabled={deleting}
-            autoFocus
           >
-            {deleting ? 'Deleting...' : 'Delete'}
+            Delete
           </Button>
         </DialogActions>
       </Dialog>
