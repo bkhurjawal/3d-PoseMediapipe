@@ -210,7 +210,7 @@ export const SideBySidePlayer: React.FC<SideBySidePlayerProps> = ({
             />
           </Grid>
           <Grid item xs={12} lg={6}>
-            <Stack spacing={1}>
+            <Stack spacing={1} sx={{ height: '100%', minHeight: 500 }}>
               {/* Model Type Selector */}
               <Box sx={{ display: 'flex', justifyContent: 'center' }}>
                 <ToggleButtonGroup
@@ -249,8 +249,8 @@ export const SideBySidePlayer: React.FC<SideBySidePlayerProps> = ({
               {/* 3D Viewer */}
               <Box
                 sx={{
-                  height: '100%',
-                  minHeight: 400,
+                  flex: 1,
+                  minHeight: 450,
                   bgcolor: 'black',
                   borderRadius: 1,
                   overflow: 'hidden',
@@ -261,12 +261,14 @@ export const SideBySidePlayer: React.FC<SideBySidePlayerProps> = ({
                     taskId={taskId}
                     currentFrame={currentFrame}
                     height="100%"
+                    width="100%"
                   />
                 ) : (
                   <Pose3DViewerBones
                     taskId={taskId}
                     currentFrame={currentFrame}
                     height="100%"
+                    width="100%"
                   />
                 )}
               </Box>
